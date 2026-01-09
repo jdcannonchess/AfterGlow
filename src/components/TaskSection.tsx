@@ -27,6 +27,7 @@ interface TaskSectionProps {
   showCount?: boolean;
   hideComplete?: boolean;
   showNextDue?: boolean;
+  onEdit?: (task: Task) => void;
 }
 
 export function TaskSection({ 
@@ -38,6 +39,7 @@ export function TaskSection({
   showCount = true,
   hideComplete = false,
   showNextDue = false,
+  onEdit,
 }: TaskSectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const { reorderTasks, tasks: allTasks } = useTaskStore();
@@ -111,7 +113,7 @@ export function TaskSection({
           >
             <div className="space-y-2 animate-slide-down">
               {tasks.map((task) => (
-                <TaskCard key={task.id} task={task} hideComplete={hideComplete} showNextDue={showNextDue} />
+                <TaskCard key={task.id} task={task} hideComplete={hideComplete} showNextDue={showNextDue} onEdit={onEdit} />
               ))}
             </div>
           </SortableContext>

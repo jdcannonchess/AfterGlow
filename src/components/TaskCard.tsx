@@ -30,6 +30,7 @@ interface TaskCardProps {
   showNextDue?: boolean; // Show next due date inline (for All Tasks view)
   isExpanded?: boolean;  // Controlled expansion state from parent
   onToggleExpand?: () => void; // Callback to toggle expansion
+  onEdit?: (task: Task) => void; // Callback to open edit modal
 }
 
 const PRIORITY_COLORS: Record<Priority, { bg: string; text: string }> = {
@@ -40,7 +41,7 @@ const PRIORITY_COLORS: Record<Priority, { bg: string; text: string }> = {
   'p4': { bg: 'bg-priority-p4', text: 'text-gray-300' },
 };
 
-export function TaskCard({ task, isDragging: externalDragging, hideComplete = false, showNextDue = false, isExpanded = false, onToggleExpand }: TaskCardProps) {
+export function TaskCard({ task, isDragging: externalDragging, hideComplete = false, showNextDue = false, isExpanded = false, onToggleExpand, onEdit }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [showMenu, setShowMenu] = useState(false);
@@ -437,7 +438,11 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
                   <div className="absolute right-0 top-full mt-1 bg-board-elevated rounded-lg shadow-xl border border-board-border py-1 z-50 min-w-[140px] animate-fade-in">
                     <button
                       onClick={() => {
-                        setIsEditing(true);
+                        if (onEdit) {
+                          onEdit(task);
+                        } else {
+                          setIsEditing(true);
+                        }
                         setShowMenu(false);
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-board-surface"

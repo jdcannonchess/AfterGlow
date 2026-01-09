@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Flag, RefreshCw, Tag, Clock } from 'lucide-react';
 import { useTaskStore } from '../stores/taskStore';
-import { Priority, TaskType, RecurrenceRule, PRIORITY_LABELS } from '../types/task';
+import { Task, Priority, TaskType, RecurrenceRule, PRIORITY_LABELS } from '../types/task';
 import { format, getDate, getDaysInMonth, getDay, startOfMonth, startOfYear, addDays } from 'date-fns';
 import { RecurrenceModal } from './RecurrenceModal';
 import { WeekHoursPreview } from './WeekHoursPreview';
@@ -11,9 +11,10 @@ import { formatMinutesToTime } from '../utils/time';
 interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
+  editTask?: Task | null;  // Task to edit, if provided modal is in edit mode
 }
 
-export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
+export function CreateTaskModal({ isOpen, onClose, editTask }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Priority>('p2');
   const [taskType, setTaskType] = useState<TaskType>('one-off');
@@ -29,7 +30,23 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
   
   const titleInputRef = useRef<HTMLInputElement>(null);
   const labelInputRef = useRef<HTMLInputElement>(null);
-  const { addTask } = useTaskStore();
+  const { addTask, editTaskAction } = useTaskStore();
+  
+  const isEditMode = !!editTask;
+
+  // Pre-fill form when editing a task
+  useEffect(() => {
+    if (editTask) {
+      setTitle(editTask.title);
+      setPriority(editTask.priority);
+      setTaskType(editTask.type);
+      setDueDate(editTask.dueDate || '');
+      setRecurrenceRule(editTask.recurrence || null);
+      setLabels(editTask.labels || []);
+      setNotes(editTask.notes || '');
+      setEstimatedMinutes(editTask.estimatedMinutes?.toString() || '');
+    }
+  }, [editTask]);
 
   // Focus title input when modal opens
   useEffect(() => {
@@ -108,7 +125,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
   const handleSubmit = () => {
     if (!title.trim()) return;
 
-    const newTask: Parameters<typeof addTask>[0] = {
+    const taskData: Partial<Task> = {
       title: title.trim(),
       type: taskType,
       priority,
@@ -119,7 +136,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
     };
 
     if (taskType === 'recurring' && recurrenceRule) {
-      newTask.recurrence = recurrenceRule;
+      taskData.recurrence = recurrenceRule;
       if (!dueDate) {
         const today = new Date();
         
@@ -131,12 +148,12 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
           const effectiveTargetDay = Math.min(targetDay, daysInMonth);
           
           if (currentDay <= effectiveTargetDay) {
-            newTask.dueDate = format(
+            taskData.dueDate = format(
               new Date(today.getFullYear(), today.getMonth(), effectiveTargetDay),
               'yyyy-MM-dd'
             );
           } else {
-            newTask.dueDate = getNextRecurrenceDate(recurrenceRule);
+            taskData.dueDate = getNextRecurrenceDate(recurrenceRule);
           }
         }
         // For quarterly tasks
@@ -151,15 +168,15 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
             const effectiveTargetDay = Math.min(targetDay, daysInMonth);
             
             if (currentDay <= effectiveTargetDay) {
-              newTask.dueDate = format(
+              taskData.dueDate = format(
                 new Date(today.getFullYear(), today.getMonth(), effectiveTargetDay),
                 'yyyy-MM-dd'
               );
             } else {
-              newTask.dueDate = getNextRecurrenceDate(recurrenceRule);
+              taskData.dueDate = getNextRecurrenceDate(recurrenceRule);
             }
           } else {
-            newTask.dueDate = getNextRecurrenceDate(recurrenceRule);
+            taskData.dueDate = getNextRecurrenceDate(recurrenceRule);
           }
         }
         // For nth-weekday patterns
@@ -199,24 +216,33 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
             }
             
             if (targetDate && targetDate >= today) {
-              newTask.dueDate = format(targetDate, 'yyyy-MM-dd');
+              taskData.dueDate = format(targetDate, 'yyyy-MM-dd');
             } else {
-              newTask.dueDate = getNextRecurrenceDate(recurrenceRule);
+              taskData.dueDate = getNextRecurrenceDate(recurrenceRule);
             }
           } else {
-            newTask.dueDate = getNextRecurrenceDate(recurrenceRule);
+            taskData.dueDate = getNextRecurrenceDate(recurrenceRule);
           }
         }
         // For weekly/biweekly/other patterns
         else if (doesRecurringTaskApplyToDate(recurrenceRule, today)) {
-          newTask.dueDate = format(today, 'yyyy-MM-dd');
+          taskData.dueDate = format(today, 'yyyy-MM-dd');
         } else {
-          newTask.dueDate = getNextRecurrenceDate(recurrenceRule);
+          taskData.dueDate = getNextRecurrenceDate(recurrenceRule);
         }
       }
+    } else if (taskType === 'one-off') {
+      // Clear recurrence for one-off tasks
+      taskData.recurrence = undefined;
     }
 
-    addTask(newTask);
+    if (isEditMode && editTask) {
+      // Edit existing task
+      editTaskAction(editTask.id, taskData, editTask);
+    } else {
+      // Create new task
+      addTask(taskData);
+    }
     handleClose();
   };
 
@@ -251,7 +277,9 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-board-border">
-            <h2 className="text-lg font-medium text-white">Create New Task</h2>
+            <h2 className="text-lg font-medium text-white">
+              {isEditMode ? 'Edit Switchback' : 'Create New Task'}
+            </h2>
             <button
               onClick={handleClose}
               className="p-1 rounded hover:bg-board-elevated transition-colors"
@@ -476,7 +504,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
               className="px-4 py-2 text-sm bg-accent-gold text-black rounded-lg hover:bg-accent-warm transition-colors 
                 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
-              Create Task
+              {isEditMode ? 'Save Changes' : 'Create Task'}
             </button>
           </div>
         </div>

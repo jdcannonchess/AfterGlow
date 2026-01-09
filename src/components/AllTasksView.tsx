@@ -77,7 +77,11 @@ function Dropdown<T extends string>({
   );
 }
 
-export function AllTasksView() {
+interface AllTasksViewProps {
+  onEdit?: (task: Task) => void;
+}
+
+export function AllTasksView({ onEdit }: AllTasksViewProps) {
   const { tasks } = useTaskStore();
   
   // Control state
@@ -228,6 +232,7 @@ export function AllTasksView() {
                 showCount={true}
                 hideComplete={true}
                 showNextDue={true}
+                onEdit={onEdit}
               />
             )}
             
@@ -238,6 +243,7 @@ export function AllTasksView() {
                 showCount={true}
                 hideComplete={false}
                 defaultCollapsed={true}
+                onEdit={onEdit}
               />
             )}
           </div>

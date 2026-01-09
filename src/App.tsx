@@ -8,12 +8,14 @@ import { FloatingActionButton } from './components/FloatingActionButton';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { useTaskStore } from './stores/taskStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { Task } from './types/task';
 
 export type ViewType = 'today' | 'all' | 'week';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewType>('today');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { loadTasks, isLoading } = useTaskStore();
 
   useKeyboardShortcuts({
@@ -29,16 +31,26 @@ function App() {
     setCurrentView('today');
   }, []);
 
+  const handleEditTask = useCallback((task: Task) => {
+    setEditingTask(task);
+    setIsCreateModalOpen(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setIsCreateModalOpen(false);
+    setEditingTask(null);
+  }, []);
+
   const renderView = () => {
     switch (currentView) {
       case 'today':
-        return <TodayView />;
+        return <TodayView onEdit={handleEditTask} />;
       case 'all':
-        return <AllTasksView />;
+        return <AllTasksView onEdit={handleEditTask} />;
       case 'week':
         return <WeeklyView onNavigateToDate={handleNavigateToDate} />;
       default:
-        return <TodayView />;
+        return <TodayView onEdit={handleEditTask} />;
     }
   };
 
@@ -60,7 +72,8 @@ function App() {
       <FloatingActionButton onClick={() => setIsCreateModalOpen(true)} />
       <CreateTaskModal 
         isOpen={isCreateModalOpen} 
-        onClose={() => setIsCreateModalOpen(false)} 
+        onClose={handleCloseModal}
+        editTask={editingTask}
       />
     </div>
   );

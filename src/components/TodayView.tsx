@@ -64,7 +64,11 @@ function getOverdueTasks(tasks: Task[], beforeDate: Date): Task[] {
   });
 }
 
-export function TodayView() {
+interface TodayViewProps {
+  onEdit?: (task: Task) => void;
+}
+
+export function TodayView({ onEdit }: TodayViewProps) {
   const [activeTab, setActiveTab] = useState<TabType>('todo');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -405,6 +409,7 @@ export function TodayView() {
                     task={task}
                     isExpanded={expandedTaskId === task.id}
                     onToggleExpand={() => handleToggleExpand(task.id)}
+                    onEdit={onEdit}
                   />
                 ))}
               </div>

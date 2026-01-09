@@ -18,6 +18,7 @@ interface TaskStore {
   
   addTask: (task: Partial<Task>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
+  editTaskAction: (id: string, updates: Partial<Task>, originalTask: Task) => void;
   deleteTask: (id: string) => void;
   completeTask: (id: string) => void;
   uncompleteTask: (id: string) => void;
@@ -133,6 +134,41 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     );
     set({ tasks: updatedTasks });
     get().saveTasks();
+  },
+
+  editTaskAction: (id: string, updates: Partial<Task>, originalTask: Task) => {
+    // Check if recurrence pattern changed (only matters if both are recurring)
+    const recurrenceChanged = 
+      JSON.stringify(updates.recurrence) !== JSON.stringify(originalTask.recurrence);
+    
+    const needsFork = 
+      originalTask.type === 'recurring' && 
+      updates.type === 'recurring' && 
+      recurrenceChanged;
+    
+    if (needsFork) {
+      // FORK: Delete old task, create new recurring chain with new pattern
+      // Step 1: Delete the old task
+      get().deleteTask(id);
+      
+      // Step 2: Create new recurring task with updated pattern
+      // The dueDate should already be calculated by CreateTaskModal
+      get().addTask({
+        title: updates.title ?? originalTask.title,
+        type: 'recurring',
+        priority: updates.priority ?? originalTask.priority,
+        notes: updates.notes ?? originalTask.notes,
+        labels: updates.labels ?? originalTask.labels,
+        estimatedMinutes: updates.estimatedMinutes ?? originalTask.estimatedMinutes,
+        recurrence: updates.recurrence,
+        dueDate: updates.dueDate,
+      });
+    } else {
+      // Simple update in place for:
+      // - Cosmetic changes (title, notes, priority, labels, time)
+      // - Type changes (recurring→one-off removes recurrence; one-off→recurring adds it)
+      get().updateTask(id, updates);
+    }
   },
 
   deleteTask: (id: string) => {
