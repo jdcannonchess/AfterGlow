@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Flag, RefreshCw, Tag, X } from 'lucide-react';
+import { Plus, Flag, RefreshCw, Tag, X, Clock } from 'lucide-react';
 import { useTaskStore } from '../stores/taskStore';
 import { Priority, TaskType, RecurrenceRule } from '../types/task';
 import { PRIORITY_LABELS } from '../types/task';
 import { format, getDate, getDaysInMonth, getDay, startOfMonth, startOfYear, addDays } from 'date-fns';
 import { RecurrenceModal } from './RecurrenceModal';
 import { formatRecurrence, doesRecurringTaskApplyToDate, getNextRecurrenceDate } from '../utils/recurrence';
+import { formatMinutesToTime } from '../utils/time';
 
 interface QuickAddProps {
   defaultType?: TaskType;
@@ -24,6 +25,7 @@ export function QuickAdd({ defaultType = 'one-off' }: QuickAddProps) {
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [notes, setNotes] = useState('');
+  const [estimatedMinutes, setEstimatedMinutes] = useState<string>('');
   
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -98,6 +100,7 @@ export function QuickAdd({ defaultType = 'one-off' }: QuickAddProps) {
       dueDate: dueDate || undefined,
       labels: labels.length > 0 ? labels : undefined,
       notes: notes.trim() || undefined,
+      estimatedMinutes: estimatedMinutes ? parseInt(estimatedMinutes, 10) : undefined,
     };
 
     if (taskType === 'recurring' && recurrenceRule) {
@@ -220,6 +223,7 @@ export function QuickAdd({ defaultType = 'one-off' }: QuickAddProps) {
     setRecurrenceRule(null);
     setLabels([]);
     setTaskType(defaultType);
+    setEstimatedMinutes('');
     setIsExpanded(false);
   };
 
@@ -327,6 +331,28 @@ export function QuickAdd({ defaultType = 'one-off' }: QuickAddProps) {
                     </button>
                   ))}
                 </div>
+              )}
+            </div>
+
+            {/* Time estimate input */}
+            <div className="flex items-center gap-1">
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-md ${
+                estimatedMinutes ? 'bg-accent-gold/20 border border-accent-gold/30' : 'bg-board-elevated'
+              }`}>
+                <Clock size={12} className={estimatedMinutes ? 'text-accent-gold' : 'text-board-muted'} />
+                <input
+                  type="number"
+                  value={estimatedMinutes}
+                  onChange={(e) => setEstimatedMinutes(e.target.value)}
+                  placeholder="Est. mins"
+                  min="1"
+                  className="w-16 bg-transparent text-xs text-white placeholder-board-muted focus:outline-none"
+                />
+              </div>
+              {estimatedMinutes && parseInt(estimatedMinutes, 10) > 0 && (
+                <span className="text-xs text-accent-gold">
+                  = {formatMinutesToTime(parseInt(estimatedMinutes, 10))}
+                </span>
               )}
             </div>
 

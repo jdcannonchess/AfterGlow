@@ -46,6 +46,7 @@ export interface Task {
   recurrence?: RecurrenceRule;
   parentRecurringId?: string;
   sortOrder: number;
+  estimatedMinutes?: number;  // Optional time estimate in minutes
 }
 
 export interface TaskData {

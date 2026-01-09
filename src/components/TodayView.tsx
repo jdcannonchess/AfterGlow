@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Sun, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Sun, CheckCircle2, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useTaskStore } from '../stores/taskStore';
 import { TaskCard } from './TaskCard';
 import { QuickAdd } from './QuickAdd';
 import { format, isToday, parseISO, isSameDay, addDays, subDays, startOfDay, isBefore, isSameDay as isSameDayCheck, isValid } from 'date-fns';
 import { PRIORITY_WEIGHT, Task } from '../types/task';
 import { doesRecurringTaskApplyToDate } from '../utils/recurrence';
+import { formatMinutesToTime } from '../utils/time';
 
 // Minimum date - cannot navigate before this date
 const MIN_DATE = new Date('2026-01-07');
@@ -81,6 +82,17 @@ export function TodayView() {
   const allDayTasks = [...overdueTasks, ...tasksForDate].sort((a, b) => {
     return PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority];
   });
+
+  // Calculate time summary for tasks with estimates
+  const timeSummary = useMemo(() => {
+    const tasksWithEstimates = allDayTasks.filter(t => t.estimatedMinutes && t.estimatedMinutes > 0);
+    const totalMinutes = tasksWithEstimates.reduce((sum, t) => sum + (t.estimatedMinutes || 0), 0);
+    return {
+      totalMinutes,
+      taskCount: tasksWithEstimates.length,
+      formatted: formatMinutesToTime(totalMinutes),
+    };
+  }, [allDayTasks]);
 
   // Get tasks completed on the selected date
   const completedOnDate = tasks.filter(t => 
@@ -252,6 +264,15 @@ export function TodayView() {
             </div>
           </div>
           <div className="text-right">
+            {timeSummary.totalMinutes > 0 && (
+              <div className="flex items-center gap-1.5 justify-end mb-1">
+                <Clock size={14} className="text-accent-gold" />
+                <span className="text-lg font-semibold text-accent-gold">{timeSummary.formatted}</span>
+                <span className="text-xs text-board-muted">
+                  ({timeSummary.taskCount} {timeSummary.taskCount === 1 ? 'task' : 'tasks'})
+                </span>
+              </div>
+            )}
             <span className="text-3xl font-bold text-accent-gold">{allDayTasks.length}</span>
             <p className="text-xs text-board-muted">switchbacks to focus on</p>
           </div>

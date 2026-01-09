@@ -13,14 +13,17 @@ import {
   ChevronRight,
   StopCircle,
   AlertTriangle,
+  Clock,
 } from 'lucide-react';
 import { Task, Priority, TaskStatus, STATUS_LABELS, PRIORITY_LABELS } from '../types/task';
 import { useTaskStore } from '../stores/taskStore';
 import { formatRecurrence, getNextRecurrenceDate } from '../utils/recurrence';
+import { formatMinutesToTime } from '../utils/time';
 import { format, parseISO } from 'date-fns';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { RecurrenceModal } from './RecurrenceModal';
+import { LinkifiedText } from './LinkifiedText';
 
 interface TaskCardProps {
   task: Task;
@@ -61,10 +64,14 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
   const [notes, setNotes] = useState(task.notes || '');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showTimeInput, setShowTimeInput] = useState(false);
+  const [pendingTime, setPendingTime] = useState(task.estimatedMinutes?.toString() || '');
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const labelInputRef = useRef<HTMLInputElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const timeInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const priorityRef = useRef<HTMLDivElement>(null);
@@ -107,6 +114,13 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
   }, [showDatePicker]);
 
   useEffect(() => {
+    if (showTimeInput && timeInputRef.current) {
+      timeInputRef.current.focus();
+      timeInputRef.current.select();
+    }
+  }, [showTimeInput]);
+
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowMenu(false);
@@ -123,15 +137,27 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
   }, []);
 
   useEffect(() => {
-    if (isExpanded && notesRef.current) {
+    if (isExpanded && !task.notes && notesRef.current) {
+      // Auto-focus textarea only if there are no notes (entering new notes)
       notesRef.current.focus();
     }
-  }, [isExpanded]);
+  }, [isExpanded, task.notes]);
+
+  useEffect(() => {
+    if (isEditingNotes && notesRef.current) {
+      notesRef.current.focus();
+    }
+  }, [isEditingNotes]);
 
   // Sync notes state with task.notes when task changes
   useEffect(() => {
     setNotes(task.notes || '');
   }, [task.notes]);
+
+  // Sync pendingTime state with task.estimatedMinutes when task changes
+  useEffect(() => {
+    setPendingTime(task.estimatedMinutes?.toString() || '');
+  }, [task.estimatedMinutes]);
 
   const handleSaveEdit = () => {
     if (editTitle.trim()) {
@@ -204,6 +230,12 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
     setShowDatePicker(false);
   };
 
+  const handleTimeSubmit = () => {
+    const minutes = pendingTime ? parseInt(pendingTime, 10) : undefined;
+    updateTask(task.id, { estimatedMinutes: minutes && minutes > 0 ? minutes : undefined });
+    setShowTimeInput(false);
+  };
+
   const handleRecurrenceSave = (rule: typeof task.recurrence) => {
     updateTask(task.id, { recurrence: rule });
   };
@@ -216,7 +248,12 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
 
   const handleToggleExpand = () => {
     if (!isEditing) {
-      setIsExpanded(!isExpanded);
+      const newExpanded = !isExpanded;
+      setIsExpanded(newExpanded);
+      // Reset notes editing state when collapsing
+      if (!newExpanded) {
+        setIsEditingNotes(false);
+      }
     }
   };
 
@@ -281,13 +318,12 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
                 />
               ) : (
                 <div className="flex items-center gap-1.5">
-                  <p 
+                  <LinkifiedText 
+                    text={task.title}
                     className="text-sm text-gray-200 cursor-pointer truncate hover:text-white"
                     onClick={handleToggleExpand}
                     onDoubleClick={() => setIsEditing(true)}
-                  >
-                    {task.title}
-                  </p>
+                  />
                   {hasNotes && !isExpanded && (
                     <FileText size={12} className="flex-shrink-0 text-board-muted" title="Has notes" />
                   )}
@@ -388,6 +424,55 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
                   <Plus size={14} />
                 </button>
               )}
+
+              {/* Time estimate display/edit */}
+              <div className="relative">
+                {showTimeInput && (
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowTimeInput(false)}
+                  />
+                )}
+                {showTimeInput ? (
+                  <div className="relative z-50 flex items-center gap-1">
+                    <input
+                      ref={timeInputRef}
+                      type="number"
+                      value={pendingTime}
+                      min="1"
+                      onChange={(e) => setPendingTime(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleTimeSubmit();
+                        if (e.key === 'Escape') setShowTimeInput(false);
+                      }}
+                      placeholder="mins"
+                      className="w-16 bg-board-elevated text-xs text-white px-2 py-0.5 rounded border border-board-border focus:outline-none focus:border-accent-gold"
+                    />
+                    <button
+                      onClick={handleTimeSubmit}
+                      className="px-2 py-0.5 bg-accent-gold text-black rounded text-xs font-medium hover:bg-accent-warm transition-colors"
+                    >
+                      Go
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setPendingTime(task.estimatedMinutes?.toString() || '');
+                      setShowTimeInput(true);
+                    }}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors ${
+                      task.estimatedMinutes 
+                        ? 'bg-accent-gold/20 text-accent-gold border border-accent-gold/30 hover:bg-accent-gold/30' 
+                        : 'bg-board-elevated text-board-muted hover:text-white'
+                    }`}
+                    title="Set time estimate"
+                  >
+                    <Clock size={12} />
+                    {task.estimatedMinutes ? formatMinutesToTime(task.estimatedMinutes) : 'Est.'}
+                  </button>
+                )}
+              </div>
 
               {/* Date display - one-off tasks show date picker, recurring tasks show next due in All Tasks view */}
               {task.type === 'one-off' ? (
@@ -571,15 +656,31 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
                 </div>
               )}
               
-              {/* Notes textarea */}
-              <textarea
-                ref={notesRef}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                onBlur={handleSaveNotes}
-                placeholder="Add notes or description..."
-                className="w-full min-h-[80px] bg-board-elevated text-sm text-gray-300 p-3 rounded-lg border border-board-border focus:outline-none focus:border-accent-gold resize-y placeholder-board-muted"
-              />
+              {/* Notes section - view mode with clickable links, edit mode with textarea */}
+              {isEditingNotes || !task.notes ? (
+                <textarea
+                  ref={notesRef}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  onBlur={() => {
+                    handleSaveNotes();
+                    if (notes.trim()) {
+                      setIsEditingNotes(false);
+                    }
+                  }}
+                  onFocus={() => setIsEditingNotes(true)}
+                  placeholder="Add notes or description..."
+                  className="w-full min-h-[80px] bg-board-elevated text-sm text-gray-300 p-3 rounded-lg border border-board-border focus:outline-none focus:border-accent-gold resize-y placeholder-board-muted"
+                />
+              ) : (
+                <div
+                  onClick={() => setIsEditingNotes(true)}
+                  className="w-full min-h-[80px] bg-board-elevated text-sm text-gray-300 p-3 rounded-lg border border-board-border cursor-text hover:border-board-muted transition-colors whitespace-pre-wrap"
+                  title="Click to edit"
+                >
+                  <LinkifiedText text={task.notes} />
+                </div>
+              )}
             </div>
           )}
         </div>
