@@ -1,0 +1,42 @@
+# Afterglow - Cursor Rules
+
+## CRITICAL: Data Protection
+
+### DO NOT CHANGE the `identifier` in `tauri.conf.json`
+
+The current identifier is: `com.dailycommandboard.desktop`
+
+**Why this matters:** Tauri uses this identifier to determine the app data storage path. Changing it will cause the app to look for data in a different location, making existing user data inaccessible.
+
+**Data location:** `C:\Users\{username}\AppData\Roaming\com.dailycommandboard.desktop\tasks.json`
+
+### Before making config changes:
+
+1. **Backup the data file** before modifying `tauri.conf.json`
+2. If you must change the identifier, implement a data migration first
+3. Test config changes with a copy of the data, not the original
+
+### Safe to change:
+
+- `productName` - User-facing app name (currently "Afterglow")
+- `windows.title` - Window title bar text
+- `version` - App version number
+- UI/frontend code
+
+### NOT safe to change without migration:
+
+- `identifier` - Determines data storage path
+- Data file format/schema (requires migration code)
+- Rust backend data structures
+
+## App Terminology
+
+- App name: **Afterglow**
+- Tasks are called: **Switchbacks**
+- All Tasks view is called: **Canopy**
+
+## Data Storage
+
+- Tasks stored in: `tasks.json` in app data directory
+- Automatic backups kept in: `backups/` subdirectory (last 5 saves)
+- Format: JSON with tasks, labels, and stakeholders arrays
