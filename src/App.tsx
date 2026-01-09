@@ -2,29 +2,32 @@ import { useEffect, useState, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TodayView } from './components/TodayView';
 import { AllTasksView } from './components/AllTasksView';
+import { WeeklyView } from './components/WeeklyView';
 import { KeyboardHint } from './components/KeyboardHint';
+import { FloatingActionButton } from './components/FloatingActionButton';
+import { CreateTaskModal } from './components/CreateTaskModal';
 import { useTaskStore } from './stores/taskStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
-export type ViewType = 'today' | 'all';
+export type ViewType = 'today' | 'all' | 'week';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewType>('today');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { loadTasks, isLoading } = useTaskStore();
-
-  const handleQuickAdd = useCallback(() => {
-    // Focus quick add - could be enhanced to actually trigger it
-    console.log('Quick add triggered');
-  }, []);
 
   useKeyboardShortcuts({
     onViewChange: setCurrentView,
-    onQuickAdd: handleQuickAdd,
   });
 
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  const handleNavigateToDate = useCallback((date: Date) => {
+    useTaskStore.getState().setSelectedDate(date);
+    setCurrentView('today');
+  }, []);
 
   const renderView = () => {
     switch (currentView) {
@@ -32,6 +35,8 @@ function App() {
         return <TodayView />;
       case 'all':
         return <AllTasksView />;
+      case 'week':
+        return <WeeklyView onNavigateToDate={handleNavigateToDate} />;
       default:
         return <TodayView />;
     }
@@ -52,6 +57,11 @@ function App() {
         {renderView()}
       </main>
       <KeyboardHint />
+      <FloatingActionButton onClick={() => setIsCreateModalOpen(true)} />
+      <CreateTaskModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)} 
+      />
     </div>
   );
 }

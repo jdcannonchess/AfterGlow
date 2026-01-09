@@ -3,7 +3,6 @@ import { List, Search, ChevronDown, Check } from 'lucide-react';
 import { useTaskStore } from '../stores/taskStore';
 import { sortTasks, sortByCreatedAt, sortByLabels } from '../utils/sorting';
 import { TaskSection } from './TaskSection';
-import { QuickAdd } from './QuickAdd';
 import { Task, RecurrencePattern } from '../types/task';
 
 type SortOption = 'created' | 'priority' | 'labels';
@@ -199,10 +198,6 @@ export function AllTasksView() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="mb-6">
-          <QuickAdd />
-        </div>
-
         {/* Results summary when filtered */}
         {(searchQuery || filterType !== 'all') && (
           <p className="text-xs text-board-muted mb-4">
@@ -221,7 +216,7 @@ export function AllTasksView() {
             <p className="text-board-muted text-sm max-w-sm">
               {searchQuery || filterType !== 'all' 
                 ? 'Try adjusting your filters or search query.'
-                : 'Start by adding your first switchback above.'}
+                : 'Click the + button to add your first switchback.'}
             </p>
           </div>
         ) : (

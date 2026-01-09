@@ -9,13 +9,11 @@ import {
   X,
   Calendar,
   FileText,
-  ChevronDown,
-  ChevronRight,
   StopCircle,
   AlertTriangle,
   Clock,
 } from 'lucide-react';
-import { Task, Priority, TaskStatus, STATUS_LABELS, PRIORITY_LABELS } from '../types/task';
+import { Task, Priority, PRIORITY_LABELS } from '../types/task';
 import { useTaskStore } from '../stores/taskStore';
 import { formatRecurrence, getNextRecurrenceDate } from '../utils/recurrence';
 import { formatMinutesToTime } from '../utils/time';
@@ -30,6 +28,8 @@ interface TaskCardProps {
   isDragging?: boolean;
   hideComplete?: boolean;
   showNextDue?: boolean; // Show next due date inline (for All Tasks view)
+  isExpanded?: boolean;  // Controlled expansion state from parent
+  onToggleExpand?: () => void; // Callback to toggle expansion
 }
 
 const PRIORITY_COLORS: Record<Priority, { bg: string; text: string }> = {
@@ -40,27 +40,15 @@ const PRIORITY_COLORS: Record<Priority, { bg: string; text: string }> = {
   'p4': { bg: 'bg-priority-p4', text: 'text-gray-300' },
 };
 
-const STATUS_COLORS: Record<TaskStatus, { bg: string; text: string }> = {
-  'not-started': { bg: 'bg-board-muted/20', text: 'text-board-muted' },
-  'in-progress': { bg: 'bg-status-active/20', text: 'text-status-active' },
-  'waiting': { bg: 'bg-status-waiting/20', text: 'text-status-waiting' },
-  'needs-review': { bg: 'bg-status-review/20', text: 'text-status-review' },
-  'blocked': { bg: 'bg-status-blocked/20', text: 'text-status-blocked' },
-  'someday': { bg: 'bg-board-muted/20', text: 'text-board-muted' },
-  'done': { bg: 'bg-status-active/20', text: 'text-status-active' },
-};
-
-export function TaskCard({ task, isDragging: externalDragging, hideComplete = false, showNextDue = false }: TaskCardProps) {
+export function TaskCard({ task, isDragging: externalDragging, hideComplete = false, showNextDue = false, isExpanded = false, onToggleExpand }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [showMenu, setShowMenu] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
-  const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showRecurrenceModal, setShowRecurrenceModal] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [notes, setNotes] = useState(task.notes || '');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -75,7 +63,6 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const priorityRef = useRef<HTMLDivElement>(null);
-  const statusRef = useRef<HTMLDivElement>(null);
   
   const { updateTask, deleteTask, completeTask, endTask } = useTaskStore();
 
@@ -128,9 +115,6 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
       if (priorityRef.current && !priorityRef.current.contains(event.target as Node)) {
         setShowPriorityMenu(false);
       }
-      if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
-        setShowStatusMenu(false);
-      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -159,6 +143,13 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
     setPendingTime(task.estimatedMinutes?.toString() || '');
   }, [task.estimatedMinutes]);
 
+  // Reset notes editing state when task is collapsed
+  useEffect(() => {
+    if (!isExpanded) {
+      setIsEditingNotes(false);
+    }
+  }, [isExpanded]);
+
   const handleSaveEdit = () => {
     if (editTitle.trim()) {
       updateTask(task.id, { title: editTitle.trim() });
@@ -180,15 +171,6 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
   const handlePriorityChange = (priority: Priority) => {
     updateTask(task.id, { priority });
     setShowPriorityMenu(false);
-  };
-
-  const handleStatusChange = (status: TaskStatus) => {
-    if (status === 'done') {
-      completeTask(task.id);
-    } else {
-      updateTask(task.id, { status });
-    }
-    setShowStatusMenu(false);
   };
 
   const handleComplete = (e: React.MouseEvent) => {
@@ -247,20 +229,14 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
   };
 
   const handleToggleExpand = () => {
-    if (!isEditing) {
-      const newExpanded = !isExpanded;
-      setIsExpanded(newExpanded);
-      // Reset notes editing state when collapsing
-      if (!newExpanded) {
-        setIsEditingNotes(false);
-      }
+    if (!isEditing && onToggleExpand) {
+      onToggleExpand();
     }
   };
 
   const actualDragging = isDragging || externalDragging;
   const hasNotes = task.notes && task.notes.trim().length > 0;
   const priorityColor = PRIORITY_COLORS[task.priority];
-  const statusColor = STATUS_COLORS[task.status];
 
   return (
     <>
@@ -273,7 +249,10 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
           ${actualDragging ? 'opacity-50 shadow-lg scale-[1.02]' : 'hover:border-board-muted'}
         `}
       >
-        <div className="px-3 py-2.5">
+        <div 
+          className="px-3 py-2.5 cursor-pointer"
+          onClick={handleToggleExpand}
+        >
           {/* Main task row */}
           <div className="flex items-center gap-2">
             {/* Complete button - hidden in All Tasks view */}
@@ -296,14 +275,6 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
               </button>
             )}
 
-            {/* Expand/collapse indicator */}
-            <button
-              onClick={handleToggleExpand}
-              className="flex-shrink-0 p-0.5 text-board-muted hover:text-white transition-colors"
-            >
-              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </button>
-
             {/* Title */}
             <div className="flex-1 min-w-0" {...attributes} {...listeners}>
               {isEditing ? (
@@ -320,9 +291,11 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
                 <div className="flex items-center gap-1.5">
                   <LinkifiedText 
                     text={task.title}
-                    className="text-sm text-gray-200 cursor-pointer truncate hover:text-white"
-                    onClick={handleToggleExpand}
-                    onDoubleClick={() => setIsEditing(true)}
+                    className="text-sm text-gray-200 truncate hover:text-white"
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      setIsEditing(true);
+                    }}
                   />
                   {hasNotes && !isExpanded && (
                     <FileText size={12} className="flex-shrink-0 text-board-muted" title="Has notes" />
@@ -331,13 +304,13 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
               )}
             </div>
 
-            {/* Inline badges row */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {/* Priority badge - clickable */}
-              <div className="relative" ref={priorityRef}>
+            {/* Inline badges row - fixed column widths for alignment */}
+            <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+              {/* Priority badge - fixed width */}
+              <div className="w-8 flex-shrink-0 relative" ref={priorityRef}>
                 <button
                   onClick={() => setShowPriorityMenu(!showPriorityMenu)}
-                  className={`px-2 py-0.5 rounded text-xs font-medium ${priorityColor.bg} ${priorityColor.text} hover:opacity-80 transition-opacity`}
+                  className={`w-full px-2 py-0.5 rounded text-xs font-medium ${priorityColor.bg} ${priorityColor.text} hover:opacity-80 transition-opacity`}
                 >
                   {task.priority.toUpperCase()}
                 </button>
@@ -359,74 +332,51 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
                 )}
               </div>
 
-              {/* Status badge - clickable */}
-              <div className="relative" ref={statusRef}>
-                <button
-                  onClick={() => setShowStatusMenu(!showStatusMenu)}
-                  className={`px-2 py-0.5 rounded text-xs ${statusColor.bg} ${statusColor.text} hover:opacity-80 transition-opacity`}
-                >
-                  {STATUS_LABELS[task.status]}
-                </button>
-                {showStatusMenu && (
-                  <div className="absolute right-0 top-full mt-1 bg-board-elevated rounded-lg shadow-xl border border-board-border py-1 z-50 min-w-[120px]">
-                    {(['not-started', 'in-progress', 'waiting', 'needs-review', 'blocked', 'done'] as TaskStatus[]).map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => handleStatusChange(status)}
-                        className={`w-full text-left px-3 py-1.5 text-xs hover:bg-board-surface ${
-                          task.status === status ? 'text-accent-gold' : 'text-gray-300'
-                        }`}
-                      >
-                        {STATUS_LABELS[status]}
-                      </button>
-                    ))}
-                  </div>
+              {/* Labels section - fixed width with overflow handling */}
+              <div className="w-28 flex-shrink-0 flex items-center gap-1 overflow-x-auto scrollbar-hide">
+                {task.labels && task.labels.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-gold/10 text-accent-gold rounded text-xs whitespace-nowrap"
+                  >
+                    {label}
+                    <button
+                      onClick={(e) => handleRemoveLabel(label, e)}
+                      className="hover:text-red-400"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+
+                {/* Add label button */}
+                {showLabelInput ? (
+                  <input
+                    ref={labelInputRef}
+                    type="text"
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    onKeyDown={handleLabelKeyDown}
+                    onBlur={() => {
+                      handleAddLabel();
+                      setShowLabelInput(false);
+                    }}
+                    placeholder="Label"
+                    className="w-16 bg-board-elevated text-xs text-white px-2 py-0.5 rounded border border-board-border focus:outline-none focus:border-accent-gold"
+                  />
+                ) : (
+                  <button
+                    onClick={() => setShowLabelInput(true)}
+                    className="p-0.5 rounded text-board-muted hover:text-accent-gold hover:bg-board-elevated transition-colors flex-shrink-0"
+                    title="Add label"
+                  >
+                    <Plus size={14} />
+                  </button>
                 )}
               </div>
 
-              {/* Labels - as pills */}
-              {task.labels && task.labels.map((label) => (
-                <span
-                  key={label}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-gold/10 text-accent-gold rounded text-xs"
-                >
-                  {label}
-                  <button
-                    onClick={(e) => handleRemoveLabel(label, e)}
-                    className="hover:text-red-400"
-                  >
-                    <X size={10} />
-                  </button>
-                </span>
-              ))}
-
-              {/* Add label button */}
-              {showLabelInput ? (
-                <input
-                  ref={labelInputRef}
-                  type="text"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  onKeyDown={handleLabelKeyDown}
-                  onBlur={() => {
-                    handleAddLabel();
-                    setShowLabelInput(false);
-                  }}
-                  placeholder="Label"
-                  className="w-16 bg-board-elevated text-xs text-white px-2 py-0.5 rounded border border-board-border focus:outline-none focus:border-accent-gold"
-                />
-              ) : (
-                <button
-                  onClick={() => setShowLabelInput(true)}
-                  className="p-0.5 rounded text-board-muted hover:text-accent-gold hover:bg-board-elevated transition-colors"
-                  title="Add label"
-                >
-                  <Plus size={14} />
-                </button>
-              )}
-
-              {/* Time estimate display/edit */}
-              <div className="relative">
+              {/* Time estimate - fixed width */}
+              <div className="w-16 flex-shrink-0 relative">
                 {showTimeInput && (
                   <div 
                     className="fixed inset-0 z-40" 
@@ -434,7 +384,7 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
                   />
                 )}
                 {showTimeInput ? (
-                  <div className="relative z-50 flex items-center gap-1">
+                  <div className="absolute right-0 top-0 z-50 flex items-center gap-1">
                     <input
                       ref={timeInputRef}
                       type="number"
@@ -461,7 +411,7 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
                       setPendingTime(task.estimatedMinutes?.toString() || '');
                       setShowTimeInput(true);
                     }}
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors ${
+                    className={`w-full flex items-center justify-center gap-1 px-2 py-0.5 rounded text-xs transition-colors ${
                       task.estimatedMinutes 
                         ? 'bg-accent-gold/20 text-accent-gold border border-accent-gold/30 hover:bg-accent-gold/30' 
                         : 'bg-board-elevated text-board-muted hover:text-white'
@@ -474,55 +424,8 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
                 )}
               </div>
 
-              {/* Date display - one-off tasks show date picker, recurring tasks show next due in All Tasks view */}
-              {task.type === 'one-off' ? (
-                <div className="relative">
-                  {showDatePicker && (
-                    <div 
-                      className="fixed inset-0 z-40" 
-                      onClick={() => setShowDatePicker(false)}
-                    />
-                  )}
-                  {showDatePicker ? (
-                    <div className="relative z-50 flex items-center gap-1">
-                      <input
-                        ref={dateInputRef}
-                        type="date"
-                        value={pendingDate}
-                        min="2026-01-07"
-                        onChange={(e) => setPendingDate(e.target.value)}
-                        className="w-28 bg-board-elevated text-xs text-white px-2 py-0.5 rounded border border-board-border focus:outline-none focus:border-accent-gold"
-                      />
-                      <button
-                        onClick={handleDateSubmit}
-                        className="px-2 py-0.5 bg-accent-gold text-black rounded text-xs font-medium hover:bg-accent-warm transition-colors"
-                      >
-                        Go
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setPendingDate(task.dueDate || '');
-                        setShowDatePicker(true);
-                      }}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-board-elevated text-board-muted hover:text-white transition-colors"
-                    >
-                      <Calendar size={12} />
-                      {task.dueDate ? format(parseISO(task.dueDate), 'MM/dd/yyyy') : 'Set date'}
-                    </button>
-                  )}
-                </div>
-              ) : showNextDue && task.recurrence && (
-                // Show next due date inline only in All Tasks view
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-board-elevated text-board-muted">
-                  <RefreshCw size={12} />
-                  {task.dueDate ? format(parseISO(task.dueDate), 'MM/dd') : 'No date'}
-                </span>
-              )}
-
-              {/* Actions menu */}
-              <div className="relative" ref={menuRef}>
+              {/* Actions menu - fixed width */}
+              <div className="w-8 flex-shrink-0 relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(!showMenu)}
                   className="p-1 rounded hover:bg-board-elevated transition-all text-board-muted hover:text-white"
@@ -637,7 +540,50 @@ export function TaskCard({ task, isDragging: externalDragging, hideComplete = fa
 
           {/* Expandable details section */}
           {isExpanded && (
-            <div className="mt-3 ml-7 space-y-3 animate-slide-down">
+            <div className="mt-3 ml-5 space-y-3 animate-slide-down" onClick={(e) => e.stopPropagation()}>
+              {/* Date picker for one-off tasks */}
+              {task.type === 'one-off' && (
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="relative">
+                    {showDatePicker && (
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setShowDatePicker(false)}
+                      />
+                    )}
+                    {showDatePicker ? (
+                      <div className="relative z-50 flex items-center gap-1">
+                        <input
+                          ref={dateInputRef}
+                          type="date"
+                          value={pendingDate}
+                          min="2026-01-07"
+                          onChange={(e) => setPendingDate(e.target.value)}
+                          className="w-28 bg-board-elevated text-xs text-white px-2 py-0.5 rounded border border-board-border focus:outline-none focus:border-accent-gold"
+                        />
+                        <button
+                          onClick={handleDateSubmit}
+                          className="px-2 py-0.5 bg-accent-gold text-black rounded text-xs font-medium hover:bg-accent-warm transition-colors"
+                        >
+                          Go
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setPendingDate(task.dueDate || '');
+                          setShowDatePicker(true);
+                        }}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-board-elevated text-board-muted hover:text-white border border-board-border hover:border-accent-gold transition-colors"
+                      >
+                        <Calendar size={14} />
+                        <span>{task.dueDate ? format(parseISO(task.dueDate), 'MMM d, yyyy') : 'Set due date'}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Recurrence info for recurring tasks */}
               {task.type === 'recurring' && task.recurrence && (
                 <div className="flex items-center gap-4 text-sm">

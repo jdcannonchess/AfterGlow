@@ -1,5 +1,6 @@
 import { 
   Calendar, 
+  CalendarDays,
   List, 
   ChevronRight,
   Trees,
@@ -87,6 +88,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           isActive={currentView === 'today'}
           onClick={() => onViewChange('today')}
           accentColor="text-accent-warm"
+        />
+        <NavItem
+          icon={<CalendarDays size={18} />}
+          label="Week"
+          isActive={currentView === 'week'}
+          onClick={() => onViewChange('week')}
         />
         <NavItem
           icon={<List size={18} />}

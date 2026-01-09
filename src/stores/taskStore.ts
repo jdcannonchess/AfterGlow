@@ -10,6 +10,7 @@ interface TaskStore {
   stakeholders: string[];
   isLoading: boolean;
   error: string | null;
+  selectedDate: Date | null;
 
   // Actions
   loadTasks: () => Promise<void>;
@@ -27,6 +28,8 @@ interface TaskStore {
   removeLabel: (label: string) => void;
   addStakeholder: (stakeholder: string) => void;
   removeStakeholder: (stakeholder: string) => void;
+  
+  setSelectedDate: (date: Date | null) => void;
 }
 
 // Check if we're running in Tauri
@@ -63,6 +66,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   stakeholders: [],
   isLoading: true,
   error: null,
+  selectedDate: null,
 
   loadTasks: async () => {
     set({ isLoading: true, error: null });
@@ -168,6 +172,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           recurrence: task.recurrence,
           parentRecurringId: task.parentRecurringId || task.id,
           sortOrder: maxSortOrder + 1,
+          estimatedMinutes: task.estimatedMinutes, // Preserve time estimate for recurring tasks
         };
         updatedTasks = [...updatedTasks, nextTask];
       }
@@ -248,6 +253,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }))
     });
     get().saveTasks();
+  },
+
+  setSelectedDate: (date: Date | null) => {
+    set({ selectedDate: date });
   },
 }));
 

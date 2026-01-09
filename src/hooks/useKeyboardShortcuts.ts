@@ -3,12 +3,10 @@ import { ViewType } from '../App';
 
 interface UseKeyboardShortcutsProps {
   onViewChange: (view: ViewType) => void;
-  onQuickAdd: () => void;
 }
 
 export function useKeyboardShortcuts({ 
   onViewChange, 
-  onQuickAdd 
 }: UseKeyboardShortcutsProps) {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Don't trigger shortcuts when typing in inputs
@@ -23,10 +21,6 @@ export function useKeyboardShortcuts({
     // Meta/Ctrl + key shortcuts
     if (e.metaKey || e.ctrlKey) {
       switch (e.key.toLowerCase()) {
-        case 'n':
-          e.preventDefault();
-          onQuickAdd();
-          break;
         case '1':
           e.preventDefault();
           onViewChange('today');
@@ -76,7 +70,7 @@ export function useKeyboardShortcuts({
         // Could show help modal
         break;
     }
-  }, [onViewChange, onQuickAdd]);
+  }, [onViewChange]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);

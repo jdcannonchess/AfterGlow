@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Sun, CheckCircle2, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useTaskStore } from '../stores/taskStore';
 import { TaskCard } from './TaskCard';
-import { QuickAdd } from './QuickAdd';
+import { ProgressBar } from './ProgressBar';
 import { format, isToday, parseISO, isSameDay, addDays, subDays, startOfDay, isBefore, isSameDay as isSameDayCheck, isValid } from 'date-fns';
 import { PRIORITY_WEIGHT, Task } from '../types/task';
 import { doesRecurringTaskApplyToDate } from '../utils/recurrence';
@@ -68,7 +68,21 @@ export function TodayView() {
   const [activeTab, setActiveTab] = useState<TabType>('todo');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const { tasks, reorderTasks, uncompleteTask } = useTaskStore();
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const { tasks, reorderTasks, uncompleteTask, selectedDate: storeSelectedDate, setSelectedDate: setStoreSelectedDate } = useTaskStore();
+
+  // If navigating from weekly view, use the store's selected date
+  useEffect(() => {
+    if (storeSelectedDate) {
+      setSelectedDate(storeSelectedDate);
+      setStoreSelectedDate(null); // Clear after using
+    }
+  }, [storeSelectedDate, setStoreSelectedDate]);
+
+  // Handle task expansion - only one task can be expanded at a time
+  const handleToggleExpand = (taskId: string) => {
+    setExpandedTaskId(prev => prev === taskId ? null : taskId);
+  };
   
   const isSelectedToday = isToday(selectedDate);
   
@@ -106,6 +120,19 @@ export function TodayView() {
     }
     return 0;
   });
+
+  // Calculate progress - completed time vs total time for the day
+  const progressData = useMemo(() => {
+    const completedMinutes = completedOnDate
+      .filter(t => t.estimatedMinutes && t.estimatedMinutes > 0)
+      .reduce((sum, t) => sum + (t.estimatedMinutes || 0), 0);
+    const pendingMinutes = timeSummary.totalMinutes;
+    const totalMinutes = completedMinutes + pendingMinutes;
+    return {
+      completedMinutes,
+      totalMinutes,
+    };
+  }, [completedOnDate, timeSummary.totalMinutes]);
 
   const dateStr = format(selectedDate, 'EEEE, MMMM d');
   
@@ -263,21 +290,27 @@ export function TodayView() {
               )}
             </div>
           </div>
-          <div className="text-right">
-            {timeSummary.totalMinutes > 0 && (
-              <div className="flex items-center gap-1.5 justify-end mb-1">
-                <Clock size={14} className="text-accent-gold" />
-                <span className="text-lg font-semibold text-accent-gold">{timeSummary.formatted}</span>
-                <span className="text-xs text-board-muted">
-                  ({timeSummary.taskCount} {timeSummary.taskCount === 1 ? 'task' : 'tasks'})
-                </span>
-              </div>
-            )}
-            <span className="text-3xl font-bold text-accent-gold">{allDayTasks.length}</span>
-            <p className="text-xs text-board-muted">switchbacks to focus on</p>
-          </div>
+          {timeSummary.totalMinutes > 0 && (
+            <div className="flex items-center gap-1.5 text-right">
+              <Clock size={14} className="text-accent-gold" />
+              <span className="text-lg font-semibold text-accent-gold">{timeSummary.formatted}</span>
+              <span className="text-xs text-board-muted">
+                ({timeSummary.taskCount} {timeSummary.taskCount === 1 ? 'task' : 'tasks'})
+              </span>
+            </div>
+          )}
         </div>
       </header>
+
+      {/* Progress Bar - only show when there are tasks with time estimates */}
+      {progressData.totalMinutes > 0 && (
+        <div className="px-8 pb-4">
+          <ProgressBar 
+            completedMinutes={progressData.completedMinutes}
+            totalMinutes={progressData.totalMinutes}
+          />
+        </div>
+      )}
 
       {/* Tab Navigation - styled as underlined tabs */}
       <div className="px-8 border-b border-board-border">
@@ -329,13 +362,6 @@ export function TodayView() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        {/* Quick Add - only show on To Do tab */}
-        {activeTab === 'todo' && (
-          <div className="mb-6">
-            <QuickAdd />
-          </div>
-        )}
-
         {/* Empty states */}
         {displayedTasks.length === 0 && activeTab === 'todo' && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -374,7 +400,12 @@ export function TodayView() {
             >
               <div className="space-y-2">
                 {displayedTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
+                  <TaskCard 
+                    key={task.id} 
+                    task={task}
+                    isExpanded={expandedTaskId === task.id}
+                    onToggleExpand={() => handleToggleExpand(task.id)}
+                  />
                 ))}
               </div>
             </SortableContext>
